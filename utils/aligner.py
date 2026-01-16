@@ -9,7 +9,7 @@ def align_face(image):
     Detects and aligns the most confident face to 112x112 using 5-point similarity transform.
     """
 
-    if image is None:
+    if image is None or image.size == 0:
         return None
 
     # Convert to RGB for MTCNN
