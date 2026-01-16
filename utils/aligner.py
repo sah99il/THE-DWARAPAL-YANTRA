@@ -6,31 +6,25 @@ detector = MTCNN()
 
 def align_face(image):
     """
-    Detects faces in an image, aligns them using a 5-point similarity transformation, and crops them.
-
-    Args:
-        image: The input image as a NumPy array.
-
-    Returns:
-        The aligned and cropped face as a 112x112 NumPy array, or None if no face is detected.
+    Detects and aligns the most confident face to 112x112 using 5-point similarity transform.
     """
-    results = detector.detect_faces(image)
+
+    if image is None:
+        return None
+
+    # Convert to RGB for MTCNN
+    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    results = detector.detect_faces(rgb)
+
     if not results:
         return None
 
-    # Use the face with the highest confidence
     best_face = max(results, key=lambda r: r['confidence'])
-    
+
+    if best_face['confidence'] < 0.95:
+        return None
+
     keypoints = best_face['keypoints']
-    
-    # Standard 112x112 reference points
-    ref_points = np.array([
-        [30.2946, 51.6963],  # Left eye
-        [65.5318, 51.5014],  # Right eye
-        [48.0252, 71.7366],  # Nose
-        [33.5493, 92.3655],  # Left mouth
-        [62.7299, 92.2041]   # Right mouth
-    ], dtype=np.float32)
 
     detected_points = np.array([
         keypoints['left_eye'],
@@ -40,23 +34,31 @@ def align_face(image):
         keypoints['mouth_right']
     ], dtype=np.float32)
 
-    # Compute the transformation matrix
-    # Note: cv2.estimateAffinePartial2D is for rigid transform (translation, rotation, scale)
-    # For full affine, you might use cv2.estimateAffine2D
-    # For similarity transform (which is what we want), estimateAffinePartial2D is a good choice.
-    
-    # We need to reshape the arrays for the function
-    src_pts = detected_points.reshape(1, -1, 2)
-    dst_pts = ref_points.reshape(1, -1, 2)
+    ref_points = np.array([
+        [30.2946, 51.6963],
+        [65.5318, 51.5014],
+        [48.0252, 71.7366],
+        [33.5493, 92.3655],
+        [62.7299, 92.2041]
+    ], dtype=np.float32)
 
-    # Use estimateAffinePartial2D for similarity transform
-    m, _ = cv2.estimateAffinePartial2D(src_pts, dst_pts)
-    
+    # ArcFace offset correction
+    ref_points[:, 0] += 8.0
+
+    m, _ = cv2.estimateAffinePartial2D(
+        detected_points.reshape(-1, 1, 2),
+        ref_points.reshape(-1, 1, 2)
+    )
+
     if m is None:
-        # Could not compute the transformation
         return None
 
-    # Apply the affine transformation
-    aligned_face = cv2.warpAffine(image, m, (112, 112), borderMode=cv2.BORDER_REPLICATE)
+    aligned_face = cv2.warpAffine(
+        image,
+        m,
+        (112, 112),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REPLICATE
+    )
 
     return aligned_face
