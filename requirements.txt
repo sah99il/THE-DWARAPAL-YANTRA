@@ -1,3 +1,10 @@
+<<<<<<< HEAD
 insightface
 numpy
 onnxruntime
+=======
+mtcnn
+opencv-python
+tensorflow
+numpy
+>>>>>>> a831c68fa4ad950d24e9c61cbf2873a2480dd2e0
