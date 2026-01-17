@@ -1,47 +1,46 @@
 import numpy as np
 import cv2
-from insightface.app import FaceAnalysis
+import onnxruntime as ort
+import os
 
-# Initialize InsightFace for face recognition only
-# Detection is disabled because faces are already aligned
-app = FaceAnalysis(
-    name='buffalo_l',
-    allowed_modules=['recognition']
-)
+# Define the path to the ONNX recognition model
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'models', 'buffalo_l', 'w600k_r50.onnx')
 
-# ctx_id = 0 for GPU, -1 for CPU
-app.prepare(ctx_id=0)
+class FaceExtractor:
+    def __init__(self):
+        # Initialize ONNX runtime session
+        self.session = ort.InferenceSession(MODEL_PATH, providers=['CUDAExecutionProvider'])
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_name = self.session.get_outputs()[0].name
 
+    def get_embedding(self, aligned_face: np.ndarray) -> np.ndarray:
+        # Return None if no face is provided
+        if aligned_face is None:
+            return None
 
-def get_embedding(aligned_face: np.ndarray) -> np.ndarray:
-    # Return None if no face is provided
-    if aligned_face is None:
-        return None
+        # Ensure correct input size (112x112 RGB face)
+        if aligned_face.shape != (112, 112, 3):
+            raise ValueError("Face must be 112x112x3")
 
-    # Ensure correct input size (112x112 RGB face)
-    if aligned_face.shape != (112, 112, 3):
-        raise ValueError("Face must be 112x112x3")
+        # Convert BGR (OpenCV) to RGB
+        face = cv2.cvtColor(aligned_face, cv2.COLOR_BGR2RGB)
 
-    # Convert BGR (OpenCV) to RGB (InsightFace)
-    face = cv2.cvtColor(aligned_face, cv2.COLOR_BGR2RGB)
+        # Convert to float32 for model input
+        face = face.astype(np.float32)
 
-    # Convert to float32 for model input
-    face = face.astype(np.float32)
+        # Change format from HWC to CHW
+        face = np.transpose(face, (2, 0, 1))
 
-    # Change format from HWC to CHW
-    face = np.transpose(face, (2, 0, 1))
+        # Add batch dimension
+        face = np.expand_dims(face, axis=0)
 
-    # Add batch dimension
-    face = np.expand_dims(face, axis=0)
+        # Perform inference
+        embedding = self.session.run([self.output_name], {self.input_name: face})[0]
 
-    # Extract face embedding
-    embedding = app.models['recognition'].get_feat(face)[0]
+        # Normalize embedding for cosine similarity
+        embedding = embedding / np.linalg.norm(embedding)
 
-    # Normalize embedding for cosine similarity
-    embedding = embedding / np.linalg.norm(embedding)
-
-    return embedding
-
+        return embedding[0] # Return the first (and only) embedding
 
 def compare_embeddings(e1: np.ndarray, e2: np.ndarray) -> float:
     # Return 0 if any embedding is missing

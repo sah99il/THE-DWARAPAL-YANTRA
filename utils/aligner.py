@@ -12,8 +12,14 @@ def align_face(image):
     if image is None or image.size == 0:
         return None
 
+    original_h, original_w, _ = image.shape
+    detection_size = (320, 320) # User requested detection size
+
+    # Resize image for detection
+    resized_image = cv2.resize(image, detection_size, interpolation=cv2.INTER_AREA)
+
     # Convert to RGB for MTCNN
-    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    rgb = cv2.cvtColor(resized_image, cv2.COLOR_BGR2RGB)
     results = detector.detect_faces(rgb)
 
     if not results:
@@ -24,14 +30,21 @@ def align_face(image):
     if best_face['confidence'] < 0.95:
         return None
 
-    keypoints = best_face['keypoints']
+    # Calculate scaling factors
+    scale_w = original_w / detection_size[0]
+    scale_h = original_h / detection_size[1]
+
+    # Scale keypoints back to original image size
+    scaled_keypoints = {}
+    for key, point in best_face['keypoints'].items():
+        scaled_keypoints[key] = (int(point[0] * scale_w), int(point[1] * scale_h))
 
     detected_points = np.array([
-        keypoints['left_eye'],
-        keypoints['right_eye'],
-        keypoints['nose'],
-        keypoints['mouth_left'],
-        keypoints['mouth_right']
+        scaled_keypoints['left_eye'],
+        scaled_keypoints['right_eye'],
+        scaled_keypoints['nose'],
+        scaled_keypoints['mouth_left'],
+        scaled_keypoints['mouth_right']
     ], dtype=np.float32)
 
     ref_points = np.array([
@@ -54,7 +67,7 @@ def align_face(image):
         return None
 
     aligned_face = cv2.warpAffine(
-        image,
+        image, # Use the original image for warping
         m,
         (112, 112),
         flags=cv2.INTER_LINEAR,
