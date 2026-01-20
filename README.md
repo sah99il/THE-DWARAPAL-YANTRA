@@ -1,180 +1,124 @@
-👁️ DWARAPALA – Live Biometric Gatekeeper
+DWARAPALA – Live Biometric Gatekeeper
 
-A real-time system for secure face verification with built-in liveness detection.
+Dwarapala is a real-time biometric verification system that performs face recognition and liveness detection together using a live webcam feed.
 
-📌 Overview
+The system is designed to verify two things at the same time:
 
-Dwarapala is a real-time biometric verification system that checks two things at once:
+whether the person matches an enrolled identity
 
-Identity — Is this person already enrolled in the system?
+whether the person is physically present and not a spoof
 
-Liveness — Is this a real human in front of the camera, not a photo or screen replay?
+The project focuses on practical security issues that appear in real deployments, not just lab-style face recognition accuracy.
 
-Instead of treating face recognition and liveness as separate problems, Dwarapala combines both into a single decision pipeline. The system is designed to handle real-world issues such as ID-to-selfie mismatch, replay attacks, and static spoofing attempts.
+Overview
 
-🎯 Problem Statement
+Most face recognition systems only answer one question: who is this person?
+Dwarapala also answers a second, equally important question: is this person real?
 
-Most traditional face recognition systems fail in real deployments because they:
+Instead of treating face recognition and liveness detection as separate modules, both are evaluated and fused before making a final decision. Access is granted only when identity and liveness are both confirmed.
+
+Motivation
+
+In real-world usage, many face recognition systems fail because they:
 
 Accept printed photographs
 
-Fail against mobile screen replays
+Accept mobile screen replays
 
-Struggle with ID photo vs live camera mismatch
+Perform poorly when matching ID photos with live camera images
 
-Make decisions using a single frame
+Make decisions based on a single frame
 
-Dwarapala addresses these weaknesses by enforcing temporal evidence and score-level fusion, ensuring that authentication succeeds only when the identity matches and the subject is proven live.
+Dwarapala addresses these problems by:
 
-🧠 System Architecture
-Live Webcam
-   ↓
-Face Detection & Alignment
-   ↓
-Embedding Extraction (ArcFace)
-   ↓
+Using temporal information instead of single-frame decisions
+
+Separating identity verification from liveness detection
+
+Applying score-level fusion with conservative thresholds
+
+System Pipeline
+Webcam Input
+    ↓
+Face Detection and Alignment
+    ↓
+Face Embedding Extraction (ArcFace)
+    ↓
 Identity Matching (Cosine Similarity)
-   ↓
+    ↓
 Temporal Liveness Analysis
-   ↓
+    ↓
 Score-Level Fusion
-   ↓
-Final Verdict (ALLOW / DENY)
+    ↓
+Final Decision (ALLOW / DENY)
 
 
-Each stage is modular, interpretable, and independently verifiable.
+Each stage is implemented as a separate module to keep the system modular and easy to inspect.
 
-🔍 Core Components
-1️⃣ Face Recognition (Identity Verification)
+Core Components
+Face Recognition (Identity Verification)
 
-Model: ArcFace (ONNX via InsightFace)
+Model: ArcFace (InsightFace ONNX)
 
-Input: Aligned 112 × 112 RGB face
+Input: Aligned 112×112 RGB face image
 
-Output: 512-D normalized embedding
+Output: 512-dimensional normalized embedding
 
-Similarity Metric: Cosine similarity
+Similarity metric: Cosine similarity
 
-Acceptance Threshold: ≥ 0.65
+Acceptance threshold: 0.65
 
-This setup provides robustness against:
+This setup provides reasonable robustness against lighting changes, aging effects, and low-quality or scanned ID photos.
+User embeddings are stored in a local SQLite database during enrollment.
 
-Lighting variations
+Liveness Detection
 
-Aging differences
+Liveness is evaluated over time rather than on individual frames.
 
-Low-quality or scanned ID photos
-
-2️⃣ Liveness Detection (Anti-Spoofing)
-
-Liveness is not evaluated per frame, but across time.
-
-Temporal cues used:
+The system observes short-term facial behavior using:
 
 Motion consistency across frames
 
-Eye blink detection (natural, involuntary behavior)
+Eye blink detection
 
-Texture variation (real skin vs flat displays)
+Texture variation between real skin and flat surfaces
 
 Temporal window:
-~20–30 frames (≈ 2 seconds)
 
-This approach successfully resists:
+Approximately 20–30 frames (around 2 seconds)
+
+This approach helps resist:
 
 Printed photo attacks
 
 Screen replay attacks
 
-Static or looped deepfake videos
+Static or looped spoofing attempts
 
-⚠️ No unrealistic or medical claims are made (e.g., heartbeat detection).
-All cues are proxy-based, explainable, and academically defensible.
+No medical or unrealistic claims are made. All cues are proxy-based and explainable.
 
-3️⃣ Score-Level Fusion
+Score-Level Fusion
 
-The system only grants access when both conditions are satisfied:
+The final decision is made only when both conditions are satisfied:
 
 identity_score ≥ 0.65
 liveness_score ≥ 0.70
 
 
-This conservative fusion strategy prioritizes security over convenience, reducing false acceptances in sensitive environments.
+This fusion strategy intentionally prioritizes security over convenience and reduces false acceptances.
 
-📊 Evaluation Metrics
-Metric	Description
-TAR @ FAR	True Accept Rate at fixed False Accept Rate
-ACER	Average Classification Error Rate
-Latency	< 500 ms per frame (CPU)
+Performance Notes
 
-The system is optimized for low false acceptance, making it suitable for security-critical applications.
+Runtime latency: under 500 ms per frame on CPU
 
-🧪 How to Run
+Designed for low false acceptance
 
-1️⃣ Install dependencies
+Suitable for real-time use on consumer hardware
 
-pip install -r requirements.txt
+Evaluation metrics considered:
 
+True Accept Rate at fixed False Accept Rate
 
-2️⃣ Enroll a user
+Average Classification Error Rate
 
-python -m scripts.test_enrollment
-
-
-3️⃣ Run live verification
-
-python -m scripts.live_gatekeeper
-
-
-Press q to exit the live window.
-
-📁 Project Structure
-THE-DWARAPAL-YANTRA/
-├── core/
-│   ├── face/        # alignment, embeddings, matching
-│   └── liveness/    # temporal liveness engine
-├── services/        # verification & fusion logic
-├── database/        # SQLite user embeddings
-├── scripts/         # enrollment & live runners
-├── models/          # InsightFace ONNX models
-└── README.md
-
-⚠️ Known Limitations
-
-Requires frontal or near-frontal face input
-
-Extreme lighting can affect liveness confidence
-
-Not intended for identical twin differentiation
-
-Not a medical-grade biometric system
-
-These constraints are explicitly acknowledged and documented.
-
-🚀 Applications
-
-Secure authentication systems
-
-Online exam proctoring
-
-Attendance verification
-
-Physical or digital access control
-
-Anti-spoofing and biometric research demos
-
-🏁 Conclusion
-
-Dwarapala demonstrates that identity verification alone is not sufficient for secure biometric systems. By separating who the person is from whether the person is real, and fusing both decisions conservatively, the system provides strong resistance against common spoofing attacks while remaining computationally efficient and transparent.
-
-📌 Author Notes
-
-This project focuses on:
-
-Sound engineering practices
-
-Reproducible and modular design
-
-Honest security claims
-
-Academic and technical defensibility
+Inference latency
