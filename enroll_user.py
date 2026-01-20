@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from utils.aligner import align_face
-from core.face_extractor import FaceExtractor
+from core.face.aligner import align_face
+from core.face.extractor import FaceExtractor
 from database.db_manager import DatabaseManager
 
 def main():

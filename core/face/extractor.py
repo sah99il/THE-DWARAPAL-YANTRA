@@ -15,7 +15,7 @@ class FaceExtractor:
         if aligned_face is None:
             return None
 
-        # 🔑 IMPORTANT: DO NOT re-detect face
+        #  IMPORTANT: DO NOT re-detect face
         # Instead, pass aligned face directly to recognition model
         blob = cv2.dnn.blobFromImage(
             aligned_face,
