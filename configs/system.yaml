@@ -1,0 +1,12 @@
+identity:
+  threshold: 0.45   # τ_id (from PHASE 2.3)
+
+liveness:
+  threshold: 0.62   # τ_live (from PHASE 3.5)
+  window_size: 150
+  fps: 30
+
+fusion:
+  w_texture: 0.3
+  w_temporal: 0.3
+  w_rppg: 0.4

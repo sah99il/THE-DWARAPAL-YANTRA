@@ -1,4 +1,6 @@
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 import yaml
 import torch
 import torch.nn.functional as F
@@ -35,7 +37,7 @@ loader = DataLoader(
     dataset,
     batch_size=cfg["training"]["batch_size"],
     shuffle=True,
-    num_workers=2
+    num_workers=0   # REQUIRED on Windows
 )
 
 num_classes = len(dataset.identities)
