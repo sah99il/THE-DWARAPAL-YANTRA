@@ -211,7 +211,7 @@ Thresholds are dataset-calibrated
 
 This design is explainable and PS-aligned.
 
-🚫 What Is Intentionally NOT Done (Yet)
+🚫What Is Intentionally NOT Done (Yet)
 
 Training a deep CNN liveness model
 
@@ -220,5 +220,4 @@ Using datasets at runtime
 Automatic Kaggle API downloads
 
 These are deliberate design decisions, not omissions.
-
 
