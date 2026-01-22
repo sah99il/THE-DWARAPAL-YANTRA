@@ -1,124 +1,224 @@
-DWARAPALA – Live Biometric Gatekeeper
+# 👁️ DWARAPAL YANTRA
+**A Temporal Biometric Gatekeeper with Identity Verification and Liveness Detection**
 
-Dwarapala is a real-time biometric verification system that performs face recognition and liveness detection together using a live webcam feed.
+---
 
-The system is designed to verify two things at the same time:
+## 📌 Project Overview
 
-whether the person matches an enrolled identity
+**DWARAPAL YANTRA** is a real-time biometric verification system that combines:
 
-whether the person is physically present and not a spoof
+- Database-based face identity recognition  
+- Temporal liveness detection  
+- Explainable decision logic  
+- Live webcam verification  
 
-The project focuses on practical security issues that appear in real deployments, not just lab-style face recognition accuracy.
+The system is designed to address common biometric vulnerabilities such as:
 
-Overview
+- Replay attacks  
+- Printed photo spoofing  
+- Session-only identity checks  
 
-Most face recognition systems only answer one question: who is this person?
-Dwarapala also answers a second, equally important question: is this person real?
+By enforcing **temporal evidence accumulation** and **database-driven verification**.
 
-Instead of treating face recognition and liveness detection as separate modules, both are evaluated and fused before making a final decision. Access is granted only when identity and liveness are both confirmed.
+---
 
-Motivation
+## 🎯 Problem Statement Alignment
 
-In real-world usage, many face recognition systems fail because they:
+This project satisfies the following core requirements:
 
-Accept printed photographs
+- Identity verification against an existing database  
+- Liveness detection using **temporal cues** (not single-frame inference)  
+- Explainable accept/reject decisions  
+- Resistance to spoofing attacks  
+- Separation of training, calibration, and runtime inference  
 
-Accept mobile screen replays
+> ⚠️ The system explicitly avoids instant liveness decisions and enforces a minimum observation time, as required by the problem statement.
 
-Perform poorly when matching ID photos with live camera images
+---
 
-Make decisions based on a single frame
+## 🧠 System Architecture
 
-Dwarapala addresses these problems by:
+### High-level Flow
 
-Using temporal information instead of single-frame decisions
-
-Separating identity verification from liveness detection
-
-Applying score-level fusion with conservative thresholds
-
-System Pipeline
-Webcam Input
-    ↓
-Face Detection and Alignment
-    ↓
-Face Embedding Extraction (ArcFace)
-    ↓
-Identity Matching (Cosine Similarity)
-    ↓
-Temporal Liveness Analysis
-    ↓
-Score-Level Fusion
-    ↓
-Final Decision (ALLOW / DENY)
-
-
-Each stage is implemented as a separate module to keep the system modular and easy to inspect.
-
-Core Components
-Face Recognition (Identity Verification)
-
-Model: ArcFace (InsightFace ONNX)
-
-Input: Aligned 112×112 RGB face image
-
-Output: 512-dimensional normalized embedding
-
-Similarity metric: Cosine similarity
-
-Acceptance threshold: 0.65
-
-This setup provides reasonable robustness against lighting changes, aging effects, and low-quality or scanned ID photos.
-User embeddings are stored in a local SQLite database during enrollment.
-
-Liveness Detection
-
-Liveness is evaluated over time rather than on individual frames.
-
-The system observes short-term facial behavior using:
-
-Motion consistency across frames
-
-Eye blink detection
-
-Texture variation between real skin and flat surfaces
-
-Temporal window:
-
-Approximately 20–30 frames (around 2 seconds)
-
-This approach helps resist:
-
-Printed photo attacks
-
-Screen replay attacks
-
-Static or looped spoofing attempts
-
-No medical or unrealistic claims are made. All cues are proxy-based and explainable.
-
-Score-Level Fusion
-
-The final decision is made only when both conditions are satisfied:
-
-identity_score ≥ 0.65
-liveness_score ≥ 0.70
+```text
+Live Camera Frame
+        ↓
+Face Preprocessing (224×224)
+        ↓
+Identity Identification (Database-based)
+        ↓
+Temporal Frame Buffer
+        ↓
+Liveness Evaluation (Texture + Temporal + rPPG)
+        ↓
+Evidence Accumulation (Time + Stability)
+        ↓
+Final Decision (ACCEPT / REJECT)
 
 
-This fusion strategy intentionally prioritizes security over convenience and reduces false acceptances.
+---
 
-Performance Notes
+## 📁 Project Structure
 
-Runtime latency: under 500 ms per frame on CPU
+```text
+THE-DWARAPAL-YANTRA/
+├── core/
+│   ├── identity/
+│   │   ├── vit_embedder.py        # ViT-based face embedding model
+│   │   ├── database.py            # Persistent identity database
+│   │   └── bulk_enroll.py         # One-time dataset enrollment
+│   ├── liveness/
+│   │   ├── texture.py             # Texture-based cues
+│   │   ├── temporal.py            # Temporal motion cues
+│   │   ├── rppg.py                # rPPG-based cues
+│   │   └── fusion.py              # Score fusion
+│   └── decision/
+│       └── verifier.py            # Unified verification engine
+│
+├── ui/
+│   ├── app.py                     # Streamlit UI
+│   ├── components/               # UI components
+│   └── visualizers/              # Gauges & indicators
+│
+├── data/
+│   ├── identity/                 # Face images (per person folder)
+│   ├── identity_db/              # Generated embeddings + labels (ignored)
+│   └── liveness/                 # Live & spoof videos (calibration only)
+│
+├── training/                     # Model training scripts (offline)
+├── configs/
+│   └── system.yaml               # System thresholds & parameters
+├── requirements.txt
+├── .gitignore
+└── README.md
 
-Designed for low false acceptance
+🗂️ Dataset Setup (MANDATORY)
+⚠️ Datasets are NOT included in the repository.
 
-Suitable for real-time use on consumer hardware
+Each collaborator must manually download and place datasets.
 
-Evaluation metrics considered:
+1️⃣ Identity Dataset (Face Recognition)
 
-True Accept Rate at fixed False Accept Rate
+Recommended:
 
-Average Classification Error Rate
+VGGFace2 (near fool, ~2 GB)
 
-Inference latency
+Folder structure:
+
+data/identity/
+├── n000001/
+│   ├── img1.jpg
+│   ├── img2.jpg
+├── n000002/
+│   ├── img1.jpg
+
+
+Each folder = one identity.
+
+2️⃣ Liveness Dataset (Spoof Detection)
+
+Recommended:
+
+CASIA-FASD (immada, ~2 GB)
+
+Mapped structure:
+
+data/liveness/
+├── live/
+│   ├── video1.mp4
+│   ├── video2.mp4
+├── spoof/
+│   ├── print_attack.mp4
+│   ├── replay_attack.mp4
+
+
+📌 Note:
+These videos are used offline for calibration and evaluation, not at runtime.
+
+⚙️ Installation & Setup (CLONE & RUN)
+1️⃣ Clone the repository
+git clone <repo-url>
+cd THE-DWARAPAL-YANTRA
+
+2️⃣ Create virtual environment
+python -m venv .venv
+source .venv/bin/activate     # Linux/Mac
+.venv\Scripts\activate        # Windows
+
+3️⃣ Install dependencies
+pip install -r requirements.txt
+
+4️⃣ Place datasets
+
+Manually place datasets in:
+
+data/identity/
+data/liveness/
+
+
+Ensure data/ is ignored by Git.
+
+5️⃣ Bulk enroll identities (ONE TIME)
+python core/identity/bulk_enroll.py
+
+
+This generates:
+
+data/identity_db/
+├── embeddings.npy
+└── labels.json
+
+6️⃣ Run the UI
+streamlit run ui/app.py
+
+🧪 Runtime Behavior (What to Expect)
+
+When verification starts:
+
+System collects frames
+→ COLLECTING_FRAMES
+
+Enforces minimum time window
+→ WAITING_TIME
+
+Accumulates liveness evidence
+→ LIVE_CONFIRMED / UNSTABLE_SIGNAL
+
+Final decision
+→ ACCEPT or REJECT
+
+Instant decisions are explicitly prevented.
+
+🔐 Identity Handling
+
+Identity verification is database-based
+
+No session-only enrollment
+
+Names are resolved from stored embeddings
+
+System works across restarts
+
+🛡️ Liveness Design (Important)
+
+Uses temporal analysis, not single-frame inference
+
+Uses buffered frames
+
+Applies variance-based stability checks
+
+Thresholds are dataset-calibrated
+
+This design is explainable and PS-aligned.
+
+🚫 What Is Intentionally NOT Done (Yet)
+
+Training a deep CNN liveness model
+
+Using datasets at runtime
+
+Automatic Kaggle API downloads
+
+These are deliberate design decisions, not omissions.
+
+
