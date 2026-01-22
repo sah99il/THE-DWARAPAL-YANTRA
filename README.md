@@ -1,47 +1,46 @@
-👁️ DWARAPAL YANTRA
+# 👁️ DWARAPAL YANTRA
+**A Temporal Biometric Gatekeeper with Identity Verification and Liveness Detection**
 
-A Temporal Biometric Gatekeeper with Identity Verification and Liveness Detection
+---
 
-📌 Project Overview
+## 📌 Project Overview
 
-DWARAPAL YANTRA is a real-time biometric verification system that combines:
+**DWARAPAL YANTRA** is a real-time biometric verification system that combines:
 
-Database-based face identity recognition
-
-Temporal liveness detection
-
-Explainable decision logic
-
-Live webcam verification
+- Database-based face identity recognition  
+- Temporal liveness detection  
+- Explainable decision logic  
+- Live webcam verification  
 
 The system is designed to address common biometric vulnerabilities such as:
 
-replay attacks
+- Replay attacks  
+- Printed photo spoofing  
+- Session-only identity checks  
 
-printed photo spoofing
+By enforcing **temporal evidence accumulation** and **database-driven verification**.
 
-session-only identity checks
+---
 
-by enforcing temporal evidence accumulation and database-driven verification.
-
-🎯 Problem Statement Alignment
+## 🎯 Problem Statement Alignment
 
 This project satisfies the following core requirements:
 
-Identity verification against an existing database
+- Identity verification against an existing database  
+- Liveness detection using **temporal cues** (not single-frame inference)  
+- Explainable accept/reject decisions  
+- Resistance to spoofing attacks  
+- Separation of training, calibration, and runtime inference  
 
-Liveness detection using temporal cues (not single-frame inference)
+> ⚠️ The system explicitly avoids instant liveness decisions and enforces a minimum observation time, as required by the problem statement.
 
-Explainable accept/reject decisions
+---
 
-Resistance to spoofing attacks
+## 🧠 System Architecture
 
-Separation of training, calibration, and runtime inference
+### High-level Flow
 
-The system explicitly avoids instant liveness decisions and enforces minimum observation time, as required by the problem statement.
-
-🧠 System Architecture
-High-level flow:
+```text
 Live Camera Frame
         ↓
 Face Preprocessing (224×224)
@@ -56,7 +55,12 @@ Evidence Accumulation (Time + Stability)
         ↓
 Final Decision (ACCEPT / REJECT)
 
-📁 Project Structure
+
+---
+
+## 📁 Project Structure
+
+```text
 THE-DWARAPAL-YANTRA/
 ├── core/
 │   ├── identity/
@@ -78,8 +82,8 @@ THE-DWARAPAL-YANTRA/
 │
 ├── data/
 │   ├── identity/                 # Face images (per person folder)
-│   ├── identity_db/              # Generated embeddings + labels (not committed)
-│   └── liveness/                 # Live & spoof videos (for calibration only)
+│   ├── identity_db/              # Generated embeddings + labels (ignored)
+│   └── liveness/                 # Live & spoof videos (calibration only)
 │
 ├── training/                     # Model training scripts (offline)
 ├── configs/
@@ -216,4 +220,5 @@ Using datasets at runtime
 Automatic Kaggle API downloads
 
 These are deliberate design decisions, not omissions.
+
 
