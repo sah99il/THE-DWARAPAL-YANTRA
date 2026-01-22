@@ -1,6 +1,7 @@
 import yaml
 import torch
 import numpy as np
+import time
 
 from core.identity import ViTFaceEmbedder
 from core.liveness import (
@@ -9,10 +10,13 @@ from core.liveness import (
     rppg_score,
     fuse_scores
 )
+from core.identity.database import load_db
+
 
 class DwarapalVerifier:
     """
     Unified Identity + Liveness Verification Engine
+    (Database-based identity, session-free)
     """
 
     def __init__(self, config_path, identity_ckpt):
@@ -34,35 +38,63 @@ class DwarapalVerifier:
         self.window_size = self.cfg["liveness"]["window_size"]
 
         self.buffer = []
-        self.id_embedding = None
 
-    # -------------------------
-    # Identity (once per session)
-    # -------------------------
-    @torch.no_grad()
-    def enroll_identity(self, face_tensor):
-        emb = self.identity_model(face_tensor.to(self.device))
-        self.id_embedding = emb.cpu()
-
-        # Reset cached identity score
-        if hasattr(self, "cached_identity_score"):
-            del self.cached_identity_score
-
-        return self.id_embedding
-
+        self.live_scores = []
+        self.start_time = None
 
     # -------------------------
     # Frame accumulation
     # -------------------------
     def add_frame(self, frame_rgb):
+        if self.start_time is None:
+            self.start_time = time.time()
+
         self.buffer.append(frame_rgb)
         if len(self.buffer) > self.window_size:
             self.buffer.pop(0)
+
+
+    # -------------------------
+    # Identity (DATABASE-BASED)
+    # -------------------------
+    @torch.no_grad()
+    def identify(self, live_face_tensor):
+        """
+        Identify person from identity database.
+        Returns: (name, similarity_score)
+        """
+        embeddings, labels = load_db()
+
+        if embeddings.shape[0] == 0:
+            return "Unknown", 0.0
+
+        z_live = self.identity_model(
+            live_face_tensor.to(self.device)
+        ).cpu().numpy()  # (1, 512)
+
+        # cosine similarity (embeddings are normalized)
+        sims = embeddings @ z_live.T  # (N, 1)
+
+        idx = int(np.argmax(sims))
+        score = float(sims[idx][0])
+
+        if score >= self.tau_id:
+            return labels[str(idx)], score
+
+        return "Unknown", score
 
     # -------------------------
     # Liveness evaluation
     # -------------------------
     def evaluate_liveness(self):
+        # Not enough frames yet
+        if len(self.buffer) < self.window_size:
+            return None, "COLLECTING_FRAMES"
+
+        elapsed = time.time() - self.start_time
+        if elapsed < self.cfg["liveness"]["min_seconds"]:
+            return None, "WAITING_TIME"
+
         frames = np.array(self.buffer)
 
         s_texture = texture_score(frames[-1])
@@ -78,41 +110,38 @@ class DwarapalVerifier:
             self.cfg["fusion"]["w_rppg"],
         )
 
-        return s_live
+        self.live_scores.append(s_live)
+
+        # Stability check
+        mean_score = float(np.mean(self.live_scores))
+        variance = float(np.var(self.live_scores))
+
+        if variance > self.cfg["liveness"]["max_variance"]:
+            return mean_score, "UNSTABLE_SIGNAL"
+
+        if mean_score >= self.tau_live:
+            return mean_score, "LIVE_CONFIRMED"
+
+        return mean_score, "SPOOF_SUSPECTED"
 
     # -------------------------
     # Final decision
     # -------------------------
-    @torch.no_grad()
-    def verify(self, live_face_tensor):
-        """
-        Runs identity check ONCE per session
-        and liveness periodically.
-        """
-        assert self.id_embedding is not None, "Identity not enrolled"
+    def verify(self, identity_score, liveness_result):
+        liveness_score, liveness_state = liveness_result
 
-        # -------------------------
-        # Identity similarity (ONCE)
-        # -------------------------
-        if not hasattr(self, "cached_identity_score"):
-            z_live = self.identity_model(live_face_tensor.to(self.device)).cpu()
-            self.cached_identity_score = torch.cosine_similarity(
-                self.id_embedding, z_live
-            ).item()
+        if liveness_state != "LIVE_CONFIRMED":
+            return {
+                "identity_score": identity_score,
+                "liveness_score": liveness_score or 0.0,
+                "decision": liveness_state
+            }
 
-        # -------------------------
-        # Liveness (periodic)
-        # -------------------------
-        s_live = self.evaluate_liveness()
-
-        accept = (
-            self.cached_identity_score >= self.tau_id and
-            s_live >= self.tau_live
-        )
+        accept = identity_score >= self.tau_id
 
         return {
-            "identity_score": self.cached_identity_score,
-            "liveness_score": s_live,
+            "identity_score": identity_score,
+            "liveness_score": liveness_score,
             "decision": "ACCEPT" if accept else "REJECT"
         }
 
