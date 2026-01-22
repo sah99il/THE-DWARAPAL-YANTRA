@@ -10,13 +10,15 @@ from core.liveness import (
     rppg_score,
     fuse_scores
 )
-from core.identity.database import load_db
+from core.identity.database import load_db, add_identity_with_embedding
+from core.liveness.face_roi import extract_face_roi
+
 
 
 class DwarapalVerifier:
     """
     Unified Identity + Liveness Verification Engine
-    (Database-based identity, session-free)
+    (Database-based identity, temporal liveness, PS-aligned)
     """
 
     def __init__(self, config_path, identity_ckpt):
@@ -37,9 +39,17 @@ class DwarapalVerifier:
         self.tau_live = self.cfg["liveness"]["threshold"]
         self.window_size = self.cfg["liveness"]["window_size"]
 
+        # Temporal buffers
         self.buffer = []
-
         self.live_scores = []
+        self.start_time = None
+
+    # -------------------------
+    # Reset temporal state
+    # -------------------------
+    def reset_liveness(self):
+        self.buffer.clear()
+        self.live_scores.clear()
         self.start_time = None
 
     # -------------------------
@@ -49,9 +59,14 @@ class DwarapalVerifier:
         if self.start_time is None:
             self.start_time = time.time()
 
-        self.buffer.append(frame_rgb)
-        if len(self.buffer) > self.window_size:
-            self.buffer.pop(0)
+        face = extract_face_roi(frame_rgb)
+
+        if face is not None:
+            self.buffer.append(face)
+
+            if len(self.buffer) > self.window_size:
+                self.buffer.pop(0)
+
 
 
     # -------------------------
@@ -59,10 +74,6 @@ class DwarapalVerifier:
     # -------------------------
     @torch.no_grad()
     def identify(self, live_face_tensor):
-        """
-        Identify person from identity database.
-        Returns: (name, similarity_score)
-        """
         embeddings, labels = load_db()
 
         if embeddings.shape[0] == 0:
@@ -72,9 +83,7 @@ class DwarapalVerifier:
             live_face_tensor.to(self.device)
         ).cpu().numpy()  # (1, 512)
 
-        # cosine similarity (embeddings are normalized)
-        sims = embeddings @ z_live.T  # (N, 1)
-
+        sims = embeddings @ z_live.T
         idx = int(np.argmax(sims))
         score = float(sims[idx][0])
 
@@ -84,10 +93,9 @@ class DwarapalVerifier:
         return "Unknown", score
 
     # -------------------------
-    # Liveness evaluation
+    # Liveness evaluation (TEMPORAL)
     # -------------------------
     def evaluate_liveness(self):
-        # Not enough frames yet
         if len(self.buffer) < self.window_size:
             return None, "COLLECTING_FRAMES"
 
@@ -112,7 +120,10 @@ class DwarapalVerifier:
 
         self.live_scores.append(s_live)
 
-        # Stability check
+        # keep evidence window bounded
+        if len(self.live_scores) > self.window_size:
+            self.live_scores.pop(0)
+
         mean_score = float(np.mean(self.live_scores))
         variance = float(np.var(self.live_scores))
 
@@ -145,3 +156,24 @@ class DwarapalVerifier:
             "decision": "ACCEPT" if accept else "REJECT"
         }
 
+    # -------------------------
+    # New User Enrollment (PHASE 5.7)
+    # -------------------------
+    @torch.no_grad()
+    def enroll_new_user(self, name, face_tensors):
+        """
+        face_tensors: list of (1,3,224,224) tensors
+        """
+        embeddings = []
+
+        for x in face_tensors:
+            z = self.identity_model(x.to(self.device))
+            embeddings.append(z.cpu().numpy())
+
+        mean_embedding = np.mean(
+            np.vstack(embeddings),
+            axis=0,
+            keepdims=True
+        )
+
+        add_identity_with_embedding(name, mean_embedding)

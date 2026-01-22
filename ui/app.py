@@ -7,27 +7,69 @@ import torch
 import cv2
 import time
 
-from ui.components.camera import Camera
-from ui.components.metrics import show_scores
-from ui.components.status import show_status
-from ui.visualizers.gauges import gauge
 from core.decision.verifier import DwarapalVerifier
+from core.liveness.face_roi import extract_face_roi
 
 
-# ------------------------
-# Face preprocessing
-# ------------------------
-def preprocess_face(frame_rgb, size=224):
-    face = cv2.resize(frame_rgb, (size, size))
+# ===================== CONFIG =====================
+ENROLL_SECONDS = 2.0
+VERIFY_SECONDS = 4.0
+CAMERA_INDEX = 0
+# =================================================
+
+
+# ===================== HELPERS =====================
+def preprocess_face(face_rgb, size=224):
+    face = cv2.resize(face_rgb, (size, size))
     face = torch.tensor(face).permute(2, 0, 1).unsqueeze(0).float()
     return face / 255.0
 
 
-# ------------------------
-# Streamlit setup
-# ------------------------
-st.set_page_config(page_title="DWARAPAL YANTRA", layout="wide")
-st.title("👁️ DWARAPAL — Live Biometric Gatekeeper")
+def status_card(text, color="#020617"):
+    st.markdown(
+        f"""
+        <div style="
+            padding:16px;
+            border-radius:12px;
+            background-color:{color};
+            text-align:center;
+            font-size:18px;
+            font-weight:600;
+            border:1px solid #1E293B;
+        ">
+            {text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+# =================================================
+
+
+# ===================== PAGE SETUP =====================
+st.set_page_config(page_title="DWARAPAL YANTRA", layout="centered")
+
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+button {
+    width: 100%;
+    height: 3em;
+    border-radius: 10px;
+    font-size: 16px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<h1 style="text-align:center;">👁️ DWARAPAL</h1>
+<p style="text-align:center; color:#94A3B8;">
+Real-Time Identity & Liveness Verification System
+</p>
+<hr style="border:1px solid #1E293B;">
+""", unsafe_allow_html=True)
+# =====================================================
 
 
 @st.cache_resource
@@ -39,67 +81,114 @@ def load_verifier():
 
 
 verifier = load_verifier()
-camera = Camera()
-frame_placeholder = st.empty()
 
 
-# ------------------------
-# Session state
-# ------------------------
-if "running" not in st.session_state:
-    st.session_state.running = False
+# ===================== SESSION STATE =====================
+if "mode" not in st.session_state:
+    st.session_state.mode = "idle"  # idle | enroll | verify
+
+if "start_time" not in st.session_state:
+    st.session_state.start_time = None
+
+if "face_frames" not in st.session_state:
+    st.session_state.face_frames = []
+
+if "result" not in st.session_state:
+    st.session_state.result = None
+# =======================================================
 
 
-# ------------------------
-# Controls
-# ------------------------
-st.sidebar.header("Live Verification")
+# ===================== IDLE SCREEN =====================
+if st.session_state.mode == "idle":
+    col1, col2 = st.columns(2)
 
-if st.sidebar.button("▶️ Start"):
-    st.session_state.running = True
-    verifier.buffer.clear()
-    verifier.live_scores.clear()
-    verifier.start_time = None
+    if col1.button("➕ Enroll New User"):
+        st.session_state.mode = "enroll"
+        st.session_state.start_time = time.time()
+        st.session_state.face_frames = []
+        verifier.reset_liveness()
+        st.rerun()
 
-if st.sidebar.button("⏹ Stop"):
-    st.session_state.running = False
-    verifier.buffer.clear()
-    verifier.live_scores.clear()
-    verifier.start_time = None
+    if col2.button("🔐 Verify Identity"):
+        st.session_state.mode = "verify"
+        st.session_state.start_time = time.time()
+        st.session_state.face_frames = []
+        verifier.reset_liveness()
+        st.rerun()
 
-
-# ------------------------
-# Main real-time loop
-# ------------------------
-if st.session_state.running:
-    frame = camera.read()
-
-    if frame is not None:
-        frame_placeholder.image(frame)
-
-        # ---------- Identity ----------
-        face_tensor = preprocess_face(frame)
-        name, id_score = verifier.identify(face_tensor)
-
-        # ---------- Liveness ----------
-        verifier.add_frame(frame)
-        live_score, live_state = verifier.evaluate_liveness()
-
-        # ---------- Decision ----------
-        result = verifier.verify(id_score, (live_score, live_state))
-
-        # ---------- UI ----------
-        st.subheader(f"Identity: **{name}**")
-
-        show_scores(
-            result["identity_score"],
-            result["liveness_score"]
+    if st.session_state.result:
+        st.divider()
+        status_card(
+            st.session_state.result,
+            "#064E3B" if "GRANTED" in st.session_state.result else "#7F1D1D"
         )
+# =======================================================
 
-        gauge("Identity Confidence", result["identity_score"])
-        gauge("Liveness Confidence", result["liveness_score"])
 
-        # Explainable status (PS-aligned)
-        show_status(result["decision"])
+# ===================== CAMERA STATES =====================
+if st.session_state.mode in ["enroll", "verify"]:
+    cap = cv2.VideoCapture(CAMERA_INDEX)
+    frame_slot = st.empty()
 
-    time.sleep(0.03)
+    ret, frame = cap.read()
+    cap.release()
+
+    if ret:
+        frame_slot.image(frame, channels="BGR", use_column_width=True)
+
+        face = extract_face_roi(frame)
+        if face is not None:
+            st.session_state.face_frames.append(face)
+
+    elapsed = time.time() - st.session_state.start_time
+
+    if st.session_state.mode == "enroll":
+        status_card("Recording enrollment clip…", "#020617")
+        if elapsed >= ENROLL_SECONDS:
+            st.session_state.mode = "save_enroll"
+            st.rerun()
+
+    if st.session_state.mode == "verify":
+        status_card("Analyzing live video…", "#020617")
+        if elapsed >= VERIFY_SECONDS:
+            st.session_state.mode = "finalize_verify"
+            st.rerun()
+
+    time.sleep(0.05)
+    st.rerun()
+# =======================================================
+
+
+# ===================== SAVE ENROLL =====================
+if st.session_state.mode == "save_enroll":
+    st.subheader("Save New Identity")
+    name = st.text_input("Enter user name")
+
+    if st.button("Save") and name.strip():
+        faces = [preprocess_face(f) for f in st.session_state.face_frames]
+        verifier.enroll_new_user(name.strip(), faces)
+        st.session_state.result = f"User '{name}' enrolled successfully"
+        st.session_state.mode = "idle"
+        st.rerun()
+# =======================================================
+
+
+# ===================== FINAL VERIFY =====================
+if st.session_state.mode == "finalize_verify":
+    for f in st.session_state.face_frames:
+        verifier.add_frame(f)
+
+    last_face = preprocess_face(st.session_state.face_frames[-1])
+    name, id_score = verifier.identify(last_face)
+    live_score, live_state = verifier.evaluate_liveness()
+    result = verifier.verify(id_score, (live_score, live_state))
+
+    decision = "ACCESS GRANTED" if result["decision"] == "ACCEPT" else "ACCESS DENIED"
+
+    st.session_state.result = (
+        f"Identity: {name} | {decision}"
+    )
+
+    st.session_state.mode = "idle"
+    st.rerun()
+# =======================================================

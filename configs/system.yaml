@@ -3,11 +3,11 @@ identity:
 
 liveness:
   threshold: 0.62       # τ_live (from PHASE 3.5)
-  window_size: 150      # frames (~5 sec at 30 FPS)
+  window_size: 30      # frames (~5 sec at 30 FPS)
   fps: 30
 
-  min_seconds: 4.0      # minimum observation time
-  max_variance: 0.02    # temporal stability constraint
+  min_seconds: 2.0      # minimum observation time
+  max_variance: 0.015    # temporal stability constraint
 
 fusion:
   w_texture: 0.3

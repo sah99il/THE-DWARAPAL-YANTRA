@@ -1,28 +1,16 @@
 import cv2
 import numpy as np
 
-def temporal_score(frames_rgb):
-    flows = []
+def temporal_score(face_frames):
+    diffs = []
 
-    for i in range(len(frames_rgb) - 1):
-        prev = cv2.cvtColor(frames_rgb[i], cv2.COLOR_RGB2GRAY)
-        curr = cv2.cvtColor(frames_rgb[i + 1], cv2.COLOR_RGB2GRAY)
+    for i in range(1, len(face_frames)):
+        f1 = face_frames[i-1].astype(float)
+        f2 = face_frames[i].astype(float)
+        diffs.append(np.mean(np.abs(f2 - f1)))
 
-        flow = cv2.calcOpticalFlowFarneback(
-            prev, curr, None,
-            pyr_scale=0.5, levels=2,
-            winsize=15, iterations=3,
-            poly_n=5, poly_sigma=1.2,
-            flags=0
-        )
+    mean_motion = np.mean(diffs)
 
-        mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-        flows.append(np.mean(mag))
-
-    flows = np.array(flows)
-
-    motion_var = np.var(flows)
-    motion_mean = np.mean(flows)
-
-    score = np.clip((motion_var + motion_mean) * 10.0, 0, 1)
+    # normalize motion consistency
+    score = np.exp(-mean_motion / 20.0)
     return float(score)

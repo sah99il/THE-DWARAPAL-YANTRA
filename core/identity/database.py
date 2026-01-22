@@ -40,3 +40,15 @@ def add_identity(name, embedding):
     labels[str(len(labels))] = name
 
     save_db(embeddings, labels)
+
+def add_identity_with_embedding(name, embedding):
+    embeddings, labels = load_db()
+
+    if name in labels.values():
+        raise ValueError(f"Identity '{name}' already exists")
+
+    embeddings = np.vstack([embeddings, embedding])
+    labels[str(len(labels))] = name
+
+    save_db(embeddings, labels)
+
