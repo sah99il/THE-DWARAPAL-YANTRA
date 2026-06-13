@@ -1,9 +1,6 @@
 import cv2
 from insightface.app import FaceAnalysis
 
-app = FaceAnalysis(
-    providers=['CPUExecutionProvider']
-)
 
 class FaceDetector:
     """
@@ -20,7 +17,7 @@ class FaceDetector:
         )
 
         ctx_id = 0 if device == "cuda" else -1
-        self.detector.prepare(ctx_id=ctx_id)
+        self.detector.prepare(ctx_id=ctx_id, det_size=(320, 320))
 
     def detect(self, image):
         """

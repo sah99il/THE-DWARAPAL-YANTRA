@@ -5,8 +5,8 @@ def temporal_score(face_frames):
     diffs = []
 
     for i in range(1, len(face_frames)):
-        f1 = face_frames[i-1].astype(float)
-        f2 = face_frames[i].astype(float)
+        f1 = cv2.resize(face_frames[i-1], (128, 128)).astype(float)
+        f2 = cv2.resize(face_frames[i], (128, 128)).astype(float)
         diffs.append(np.mean(np.abs(f2 - f1)))
 
     mean_motion = np.mean(diffs)

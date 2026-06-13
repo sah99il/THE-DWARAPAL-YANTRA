@@ -40,7 +40,7 @@ class SpoofNet(nn.Module):
 
 
 def load_spoof_model(checkpoint_path, device):
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model = SpoofNet().to(device)
     model.load_state_dict(ckpt["model_state"])
     model.eval()

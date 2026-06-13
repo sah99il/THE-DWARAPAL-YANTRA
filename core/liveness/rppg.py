@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 
 def rppg_score(face_frames):
@@ -5,7 +6,8 @@ def rppg_score(face_frames):
     greens = []
 
     for frame in face_frames:
-        greens.append(np.mean(frame[:, :, 1]))
+        resized = cv2.resize(frame, (128, 128))
+        greens.append(np.mean(resized[:, :, 1]))
 
     variance = np.var(greens)
 

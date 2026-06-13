@@ -1,6 +1,7 @@
 import yaml
 import torch
 import numpy as np
+from pathlib import Path
 import time
 
 from core.identity import ViTFaceEmbedder
@@ -29,9 +30,14 @@ class DwarapalVerifier:
 
         # Identity model (inference only)
         self.identity_model = ViTFaceEmbedder()
-        self.identity_model.load_state_dict(
-            torch.load(identity_ckpt, map_location=self.device)
-        )
+        ckpt_path = Path(identity_ckpt)
+        if ckpt_path.exists():
+            self.identity_model.load_state_dict(
+                torch.load(identity_ckpt, map_location=self.device, weights_only=True)
+            )
+        else:
+            print(f"[WARN] Identity checkpoint not found: {identity_ckpt}")
+            print("[WARN] Identity verification will use untrained weights.")
         self.identity_model.to(self.device)
         self.identity_model.eval()
 
@@ -73,15 +79,18 @@ class DwarapalVerifier:
     # Identity (DATABASE-BASED)
     # -------------------------
     @torch.no_grad()
-    def identify(self, live_face_tensor):
+    def identify(self, live_face_tensor, face_embedding=None):
         embeddings, labels = load_db()
 
         if embeddings.shape[0] == 0:
             return "Unknown", 0.0
 
-        z_live = self.identity_model(
-            live_face_tensor.to(self.device)
-        ).cpu().numpy()  # (1, 512)
+        if face_embedding is not None:
+            z_live = np.array(face_embedding).reshape(1, -1)
+        else:
+            z_live = self.identity_model(
+                live_face_tensor.to(self.device)
+            ).cpu().numpy()  # (1, 512)
 
         sims = embeddings @ z_live.T
         idx = int(np.argmax(sims))

@@ -19,7 +19,7 @@ class ViTBackbone(nn.Module):
             num_classes=0  # removes classification head
         )
 
-        vit_out_dim = self.vit.s
+        vit_out_dim = self.vit.num_features
 
         # Projection head (face embedding)
         self.embedding = nn.Sequential(

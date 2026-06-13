@@ -2,7 +2,9 @@ import os
 import json
 import numpy as np
 
-DB_DIR = "data/identity_db"
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_THIS_DIR, "..", ".."))
+DB_DIR = os.path.join(_PROJECT_ROOT, "data", "identity_db")
 EMB_PATH = os.path.join(DB_DIR, "embeddings.npy")
 LABEL_PATH = os.path.join(DB_DIR, "labels.json")
 

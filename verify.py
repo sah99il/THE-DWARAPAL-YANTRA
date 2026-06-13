@@ -113,6 +113,9 @@ def verify_from_camera():
     detector = FaceDetector(device=detector_device)
 
     cap = cv2.VideoCapture(0)
+    # Lower resolution to speed up CPU inference
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     emb_hist = deque(maxlen=int(getattr(config, "EMB_SMOOTH_FRAMES", 1)))
 
     while True:
@@ -267,10 +270,14 @@ def verify_from_camera():
             stable_name = candidate_name
             stable_score = candidate_score
 
-        cv2.putText(frame, stable_name, (30, 30),
+        cv2.putText(frame, stable_name, (30, 140),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f"{stable_score:.2f}", (30, 65),
+        cv2.putText(frame, f"{stable_score:.2f}", (30, 175),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
+        cv2.putText(frame, "Press 'Q' to Quit", (30, 450),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2)
+
         cv2.imshow("Verify", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):

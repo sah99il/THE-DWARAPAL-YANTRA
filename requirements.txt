@@ -6,7 +6,7 @@ timm>=0.9.12
 # Face & Vision
 opencv-python>=4.8.0
 insightface>=0.7.3
-onnxruntime-gpu>=1.17.0
+onnxruntime>=1.17.0
 
 # Scientific & Signal Processing
 numpy>=1.24
@@ -17,6 +17,12 @@ scikit-image>=0.22
 mediapipe>=0.10.9
 pillow>=10.0
 tqdm>=4.66
+
+# Web UI
+streamlit>=1.30
+
+# Config
+pyyaml>=6.0
 
 # Optional (safe)
 matplotlib>=3.8

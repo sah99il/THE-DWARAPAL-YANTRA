@@ -60,6 +60,9 @@ def enroll_from_camera(name, replace_existing: bool = False):
     detector = FaceDetector(device=detector_device)
 
     cap = cv2.VideoCapture(0)
+    # Lower resolution to speed up CPU inference
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     candidates = []
     target = int(getattr(config, "ENROLL_SAMPLES", config.NUM_ENROLL_EMBEDDINGS))
 
