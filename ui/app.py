@@ -113,7 +113,7 @@ h1 {
 
 <div class="glass-card">
     <h1>DWARAPAL YANTRA</h1>
-    <div class="subtitle">AI-Powered Identity & Liveness Engine</div>
+    <div class="subtitle">Real-Time Facial Recognition System</div>
 </div>
 """, unsafe_allow_html=True)
 # =====================================================
